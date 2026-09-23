@@ -40,8 +40,12 @@ class BrowserFlowTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("Phoenix Assist", initial["message"])
         cookie = header.split(";", 1)[0]
-        self.post("/api/reply", {"message": "yes"}, cookie)
-        self.post("/api/reply", {"message": "VERIFY"}, cookie)
+        _, consent, _ = self.post("/api/reply", {"message": "yes"}, cookie)
+        _, untrusted, _ = self.post("/api/reply", {"message": "VERIFY"}, cookie)
+        self.assertIn("waiting", untrusted["message"].lower())
+        status, approved, _ = self.post("/api/mock-approve", {"approval_id": consent["approval_id"]}, cookie)
+        self.assertEqual(status, 200)
+        self.assertTrue(approved["approved"])
         status, result, _ = self.post("/api/reply", {"message": "STATUS"}, cookie)
         self.assertEqual(status, 200)
         self.assertTrue(result["done"])
@@ -59,12 +63,39 @@ class BrowserFlowTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("مرحباً", initial["message"])
         cookie = header.split(";", 1)[0]
-        self.post("/api/reply", {"message": "نعم"}, cookie)
+        _, consent, _ = self.post("/api/reply", {"message": "نعم"}, cookie)
         self.post("/api/reply", {"message": "تحقق"}, cookie)
+        self.post("/api/mock-approve", {"approval_id": consent["approval_id"]}, cookie)
         status, result, _ = self.post("/api/reply", {"message": "الحالة"}, cookie)
         self.assertEqual(status, 200)
         self.assertIn("لا يوجد تجميد", result["message"])
         self.assertNotIn("temporary_freeze_simulated", result["events"])
+
+    def test_approval_is_bound_to_its_case(self):
+        _, _, first_header = self.post("/api/new", {})
+        first = first_header.split(";", 1)[0]
+        _, first_consent, _ = self.post("/api/reply", {"message": "yes"}, first)
+        _, _, second_header = self.post("/api/new", {})
+        second = second_header.split(";", 1)[0]
+        _, second_consent, _ = self.post("/api/reply", {"message": "yes"}, second)
+        self.post("/api/mock-approve", {"approval_id": first_consent["approval_id"]}, first)
+        status, _, _ = self.post("/api/mock-approve", {"approval_id": first_consent["approval_id"]}, second)
+        self.assertEqual(status, 409)
+        self.assertNotEqual(first_consent["approval_id"], second_consent["approval_id"])
+        status, state, _ = self.post("/api/reply", {"message": "LOST"}, second)
+        self.assertEqual(status, 200)
+        self.assertFalse(state["done"])
+        self.assertNotIn("temporary_freeze_simulated", state["events"])
+
+    def test_bank_page_accepts_case_link(self):
+        port = self.server.server_address[1]
+        conn = http.client.HTTPConnection("127.0.0.1", port)
+        conn.request("GET", "/bank?case=example")
+        response = conn.getresponse()
+        body = response.read().decode("utf-8")
+        conn.close()
+        self.assertEqual(response.status, 200)
+        self.assertIn("Mock banking app", body)
 
 
 if __name__ == "__main__":
