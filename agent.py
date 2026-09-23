@@ -50,7 +50,8 @@ class Case:
             self.stage = Stage.REQUEST
             self.audit.append("mock_verification_success")
             return ("Verification simulated. Say LOST to request a temporary card "
-                    "freeze, or HUMAN to speak to a person.")
+                    "freeze, STATUS to check this demo case, or HUMAN to speak "
+                    "to a person.")
 
         if self.stage is Stage.REQUEST:
             self.stage = Stage.DONE
@@ -59,6 +60,9 @@ class Case:
                 self.audit.append("temporary_freeze_simulated")
                 return ("A temporary freeze was simulated on the fictional card. "
                         "A person must review any permanent card action.")
+            if answer == "status" and self.verified:
+                self.audit.append("status_checked")
+                return "No temporary freeze has been applied to this fictional card."
             self.human_handoff = True
             self.audit.append("human_handoff_requested")
             return "I will refer this case to a person. No card action was taken."
