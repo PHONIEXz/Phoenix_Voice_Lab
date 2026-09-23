@@ -11,6 +11,14 @@ python agent.py
 python -m unittest -v
 ```
 
+## Speak in a browser
+
+Run `python web.py`, then open `http://127.0.0.1:8765`. Type a response or click **Speak** and allow microphone access. The browser reads the agent's replies aloud. Click **New case** to restart. Press Ctrl+C in the terminal to stop the server.
+
+The microphone uses your browser's speech recognition, if it is available. Some browsers send audio to an online recognition service; this demo does not save audio. If speech recognition is unavailable, typed input still works. Browser voices differ by operating system. No ElevenLabs account or key is needed for this local lesson.
+
+`web.py` listens only on your own computer and sends each message to the same `Case.reply()` function as the terminal app. The browser sends JSON to `/api/reply` and displays the response. This is how we keep the conversation rules in one place while changing the interface.
+
 If your Windows installation uses the Python launcher, use `py` in place of `python`.
 
 Try a successful path by entering `yes`, `VERIFY`, `LOST`. Then restart and try `yes`, `VERIFY`, `STATUS`. Finally, try `no`, or enter something other than `VERIFY`.
