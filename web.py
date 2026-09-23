@@ -6,16 +6,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import secrets
+from urllib.parse import urlsplit
 
-from agent import Case, Stage
+from agent import Case, LINES, Stage
 
 
 PAGE = Path(__file__).with_name("index.html").read_bytes()
+BANK_PAGE = Path(__file__).with_name("bank.html").read_bytes()
 SESSIONS: dict[str, Case] = {}
 MAX_BODY = 4096
 
 
 class Handler(BaseHTTPRequestHandler):
+    def current_case(self) -> Case | None:
+        cookies = SimpleCookie()
+        try:
+            cookies.load(self.headers.get("Cookie", ""))
+            return SESSIONS.get(cookies["session"].value)
+        except (KeyError, ValueError):
+            return None
+
     def respond_json(self, status: HTTPStatus, body: dict, cookie: str = "") -> None:
         data = json.dumps(body).encode("utf-8")
         self.send_response(status)
@@ -29,19 +39,32 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:
-        if self.path != "/":
+        path = urlsplit(self.path).path
+        if path == "/api/state":
+            case = self.current_case()
+            if case is None:
+                self.respond_json(HTTPStatus.BAD_REQUEST, {"error": "Start a new case"})
+                return
+            self.respond_json(HTTPStatus.OK, {
+                "approved": case.verified,
+                "done": case.stage is Stage.DONE,
+                "message": LINES[case.language]["request"] if case.verified else "",
+            })
+            return
+        if path not in ("/", "/bank"):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
+        page = PAGE if path == "/" else BANK_PAGE
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(PAGE)))
+        self.send_header("Content-Length", str(len(page)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
-        self.wfile.write(PAGE)
+        self.wfile.write(page)
 
     def do_POST(self) -> None:
-        if self.path not in ("/api/new", "/api/reply"):
+        if self.path not in ("/api/new", "/api/reply", "/api/mock-approve"):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         # Only requests from this local page are accepted by the demo server.
@@ -73,22 +96,26 @@ class Handler(BaseHTTPRequestHandler):
             self.respond_json(HTTPStatus.OK, {"message": message, "done": False}, token)
             return
 
-        cookies = SimpleCookie()
-        try:
-            cookies.load(self.headers.get("Cookie", ""))
-            token = cookies["session"].value
-        except (KeyError, ValueError):
+        case = self.current_case()
+        if case is None:
             self.respond_json(HTTPStatus.BAD_REQUEST, {"error": "Start a new case"})
             return
-        case = SESSIONS.get(token)
+        if self.path == "/api/mock-approve":
+            approval_id = payload.get("approval_id")
+            if isinstance(approval_id, str) and case.approve_mock_bank(approval_id):
+                self.respond_json(HTTPStatus.OK, {"approved": True, "message": LINES[case.language]["request"]})
+            else:
+                self.respond_json(HTTPStatus.CONFLICT, {"error": "Wrong case, approval already used, or approval expired"})
+            return
         message = payload.get("message")
-        if case is None or not isinstance(message, str) or len(message) > 300:
+        if not isinstance(message, str) or len(message) > 300:
             self.respond_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid case or message"})
             return
         reply = case.reply(message)
         self.respond_json(HTTPStatus.OK, {
             "message": reply,
             "done": case.stage is Stage.DONE,
+            "approval_id": case.approval_id if case.stage is Stage.VERIFY else None,
             "events": case.audit if case.stage is Stage.DONE else [],
         })
 
