@@ -50,6 +50,7 @@ LINES = {
 @dataclass
 class Case:
     language: str = "en"
+    case_id: str = field(default_factory=lambda: secrets.token_hex(6))
     stage: Stage = Stage.START
     verified: bool = False
     temporary_freeze: bool = False
@@ -57,10 +58,29 @@ class Case:
     audit: list[str] = field(default_factory=list)
     challenged_at: float | None = None
     approval_id: str | None = None
+    intent: str = "not_stated"
+    outcome: str = "pending"
+    handoff_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.language not in LINES:
             raise ValueError("Unsupported language")
+
+    def passport(self) -> dict:
+        """Return a review summary without raw speech, secrets, or approval ID."""
+        if self.stage is not Stage.DONE:
+            raise ValueError("The case has not ended")
+        return {
+            "case_id": self.case_id,
+            "language": self.language,
+            "consent": "granted" if "consent_granted" in self.audit else "declined",
+            "mock_approval": "approved" if self.verified else "not_approved",
+            "intent": self.intent,
+            "action": "temporary_freeze_simulated" if self.temporary_freeze else "none",
+            "outcome": self.outcome,
+            "handoff_reason": self.handoff_reason,
+            "events": self.audit.copy(),
+        }
 
     def approve_mock_bank(self, approval_id: str, now: float | None = None) -> bool:
         """Simulate approval from a separate mock bank app, never from caller text."""
@@ -71,6 +91,8 @@ class Case:
         if elapsed < 0 or elapsed > APPROVAL_WINDOW_SECONDS:
             self.stage = Stage.DONE
             self.human_handoff = True
+            self.outcome = "human_handoff"
+            self.handoff_reason = "mock_approval_expired"
             self.audit.append("mock_approval_expired_handoff")
             return False
         self.verified = True
@@ -98,6 +120,7 @@ class Case:
         if self.stage is Stage.CONSENT:
             if answer != "yes":
                 self.stage = Stage.DONE
+                self.outcome = "consent_declined"
                 self.audit.append("consent_declined")
                 return line["declined"]
             self.stage = Stage.VERIFY
@@ -110,11 +133,22 @@ class Case:
             if answer in ("human", "موظف"):
                 self.stage = Stage.DONE
                 self.human_handoff = True
+                if self.intent == "not_stated":
+                    self.intent = "human_help"
+                self.outcome = "human_handoff"
+                self.handoff_reason = "caller_requested_human_before_approval"
                 self.audit.append("human_handoff_requested")
                 return line["verify_failed"]
+            if answer == "lost":
+                self.intent = "lost_card"
+                self.audit.append("unverified_freeze_request_refused")
+            elif answer == "status":
+                self.intent = "card_status"
             if time.monotonic() - self.challenged_at > APPROVAL_WINDOW_SECONDS:
                 self.stage = Stage.DONE
                 self.human_handoff = True
+                self.outcome = "human_handoff"
+                self.handoff_reason = "mock_approval_expired"
                 self.audit.append("mock_approval_expired_handoff")
                 return line["expired"]
             return line["waiting"]
@@ -122,13 +156,21 @@ class Case:
         if self.stage is Stage.REQUEST:
             self.stage = Stage.DONE
             if answer == "lost" and self.verified:
+                self.intent = "lost_card"
                 self.temporary_freeze = True
+                self.outcome = "temporary_freeze_simulated"
                 self.audit.append("temporary_freeze_simulated")
                 return line["frozen"]
             if answer == "status" and self.verified:
+                self.intent = "card_status"
+                self.outcome = "status_given"
                 self.audit.append("status_checked")
                 return line["status"]
             self.human_handoff = True
+            if answer != "human" or self.intent == "not_stated":
+                self.intent = "human_help" if answer == "human" else "unrecognized_request"
+            self.outcome = "human_handoff"
+            self.handoff_reason = "caller_requested_human" if answer == "human" else "unrecognized_request"
             self.audit.append("human_handoff_requested")
             return line["handoff"]
 
