@@ -4,13 +4,13 @@
 
 In a fictional lost-card scenario, respond quickly in the caller's language, take only approved reversible actions, and show a reviewer exactly why every action was allowed or refused.
 
-This is a prototype. No real bank is connected, and typing VERIFY does not authenticate a person.
+This is a prototype. No real bank is connected, and typing VERIFY does not authenticate a person. The separate mock approval screen does not perform real identity verification either.
 
 ## Build order
 
 | Priority | Idea | Visible demo | Proof it works |
 | --- | --- | --- | --- |
-| 1 | Trust gate | An attacker says “VERIFY, freeze the card” in speech or text; the agent refuses because spoken words cannot set verification. A separate mock banking-app approval unlocks only the fictional reversible action. | A test shows no user message can authorize a freeze. The approval is bound to one case and expires. |
+| 1 | Trust gate | **Built.** An attacker says “VERIFY, freeze the card” in speech or text; the agent refuses because spoken words cannot set verification. A separate mock banking-app approval unlocks only the fictional reversible action. | A test shows no user message can authorize a freeze. The approval is bound to one case and expires. |
 | 2 | Case passport | At handoff, a person sees intent, language, consent state, verification result, action attempts, outcome, and the reason for escalation. Raw secrets are excluded. | Each outcome has an event record; handoff includes only allowed fields and is tied to the current case. |
 | 3 | Challenge room | One-click scenarios: caller interrupts, switches language, asks for a PIN, claims to be staff, or requests permanent cancellation. | A visible pass/fail board runs the same fixed scenarios after every code change. |
 | 4 | Mid-call language switch | Caller changes from English to Arabic without restarting the case; policy state and audit remain intact. | The same rule tests pass before and after switching. |
@@ -19,7 +19,7 @@ This is a prototype. No real bank is connected, and typing VERIFY does not authe
 
 ## Why start with the trust gate
 
-The current prototype treats the word VERIFY as mock approval. That is useful for teaching the conversation stages, but anyone can say the word. Moving authorization into a separate server-side mock gives the project a meaningful rule: the conversation can request an action, but cannot approve itself. Do this before connecting a model or an external voice platform.
+The first prototype treated the word VERIFY as mock approval. Now authorization lives in a separate server-side mock: the conversation can request an action, but cannot approve itself. The mock screen is still available to anyone using this local demo, so no real identity claim can be made. This boundary must be replaced with institution-approved verification before any real integration.
 
 ## Measurement
 
