@@ -13,7 +13,7 @@
     .agent { color: #9dd4ff; } .you { color: #e8d39a; }
     form, .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     input { flex: 1; min-width: 180px; padding: 12px; border-radius: 8px; border: 1px solid #64748b; background: #0b1220; color: white; }
-    button { padding: 12px; border: 0; border-radius: 8px; background: #38bdf8; color: #051c2c; font-weight: 700; cursor: pointer; }
+    button, .button-link { padding: 12px; border: 0; border-radius: 8px; background: #38bdf8; color: #051c2c; font-weight: 700; cursor: pointer; font: inherit; text-decoration: none; }
     button:disabled { opacity: .45; cursor: not-allowed; }
     #status { min-height: 24px; }
   </style>
@@ -23,8 +23,9 @@
   <small>Fictional bank demo. No real card or account is connected. Browser speech recognition may use an online service.</small>
   <p><label for="language">Language: </label><select id="language"><option value="en">English</option><option value="ar">العربية</option></select> <small>Changing language starts a new case.</small></p>
   <div id="log" role="log" aria-live="polite"></div>
-  <form id="form"><input id="message" aria-label="Your message" maxlength="300" autocomplete="off" placeholder="Type yes, VERIFY, LOST, STATUS or HUMAN"><button id="send">Send</button></form>
+  <form id="form"><input id="message" aria-label="Your message" maxlength="300" autocomplete="off" placeholder="Type yes, LOST, STATUS or HUMAN"><button id="send">Send</button></form>
   <div class="buttons"><button id="mic" type="button">🎙 Speak</button><button id="new" type="button">New case</button><button id="sound" type="button">🔊 Voice on</button></div>
+  <div class="buttons"><a id="bank" class="button-link" href="#" target="_blank" rel="noopener" aria-disabled="true">Open mock banking app</a><button id="check" type="button">Check approval</button></div>
   <p id="status" role="status"></p>
   <script>
     const log = document.querySelector('#log');
@@ -35,10 +36,12 @@
     const form = document.querySelector('#form');
     const sound = document.querySelector('#sound');
     const language = document.querySelector('#language');
+    const bank = document.querySelector('#bank');
     const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
     let busy = false;
     let done = false;
+    let approvalShown = false;
     let speaking = true;
 
     if (!Recognition) { mic.disabled = true; status.textContent = 'Microphone transcription is unavailable here. You can still type and hear replies.'; }
@@ -71,7 +74,8 @@
       return result;
     }
     async function newCase() {
-      busy = true; done = false; controls(); log.replaceChildren();
+      busy = true; done = false; approvalShown = false; controls(); log.replaceChildren();
+      bank.href = '#'; bank.setAttribute('aria-disabled', 'true');
       window.speechSynthesis?.cancel();
       try {
         const result = await request('/api/new', {language: language.value});
@@ -86,13 +90,23 @@
       busy = true; controls(); line('you', value); input.value = '';
       try {
         const result = await request('/api/reply', {message: value});
+        if (result.approval_id) {
+          bank.href = '/bank?case=' + encodeURIComponent(result.approval_id);
+          bank.removeAttribute('aria-disabled');
+        }
         line('agent', result.message); speak(result.message);
         done = result.done;
+        if (done) { bank.href = '#'; bank.setAttribute('aria-disabled', 'true'); }
         status.textContent = done ? 'Case ended. Events: ' + result.events.join(', ') : 'Your turn.';
       } catch (error) { status.textContent = error.message; }
       finally { busy = false; controls(); input.focus(); }
     }
     form.addEventListener('submit', event => { event.preventDefault(); submit(input.value); });
+    bank.addEventListener('click', event => {
+      if (bank.getAttribute('aria-disabled') === 'true') {
+        event.preventDefault(); status.textContent = 'Give consent before opening the mock banking app.';
+      }
+    });
     document.querySelector('#new').addEventListener('click', () => { newCase().then(() => { if (log.lastChild) speak(log.lastChild.textContent.slice(7)); }); });
     language.addEventListener('change', () => {
       if (recognition) recognition.lang = language.value === 'ar' ? 'ar-AE' : 'en-US';
@@ -102,6 +116,25 @@
       speaking = !speaking;
       sound.textContent = speaking ? '🔊 Voice on' : '🔇 Voice off';
       if (!speaking) window.speechSynthesis?.cancel();
+    });
+    document.querySelector('#check').addEventListener('click', async () => {
+      if (busy || done) return;
+      try {
+        const response = await fetch('/api/state', {cache: 'no-store'});
+        const state = await response.json();
+        if (!response.ok) throw new Error(state.error);
+        if (state.approved && !approvalShown) {
+          line('agent', state.message); speak(state.message);
+          approvalShown = true;
+          status.textContent = 'Mock banking-app approval recorded. Your turn.';
+        } else if (state.approved) {
+          status.textContent = 'Approval already recorded. Choose LOST, STATUS or HUMAN.';
+        } else {
+          status.textContent = state.done ? 'This case has ended. Start a new case.' : 'No approval yet. Open the mock banking app after giving consent.';
+        }
+        done = state.done;
+        controls();
+      } catch (error) { status.textContent = error.message; }
     });
     if (Recognition) {
       recognition = new Recognition();
