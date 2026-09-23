@@ -62,8 +62,12 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/api/new":
+            language = payload.get("language", "en")
+            if language not in ("en", "ar"):
+                self.respond_json(HTTPStatus.BAD_REQUEST, {"error": "Unsupported language"})
+                return
             token = secrets.token_urlsafe(32)
-            case = Case()
+            case = Case(language=language)
             SESSIONS[token] = case
             message = case.reply("start")
             self.respond_json(HTTPStatus.OK, {"message": message, "done": False}, token)
