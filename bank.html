@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mock Bank App Approval</title>
+  <style>
+    body { max-width: 520px; margin: 50px auto; padding: 0 18px; font: 17px system-ui; background: #0f172a; color: white; }
+    button { padding: 14px 20px; border: 0; border-radius: 8px; background: #86efac; font-weight: 700; cursor: pointer; }
+    p { line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h1>Mock banking app</h1>
+  <p>This is a separate simulated approval screen for the current fictional case. It does not verify a real identity or connect to a bank.</p>
+  <button id="approve">Approve this demo case</button>
+  <p id="result" role="status"></p>
+  <script>
+    document.querySelector('#approve').addEventListener('click', async () => {
+      const button = document.querySelector('#approve');
+      button.disabled = true;
+      try {
+        const approvalId = new URLSearchParams(location.search).get('case');
+        if (!approvalId) throw new Error('Open this screen from an active Phoenix Assist case.');
+        const response = await fetch('/api/mock-approve', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({approval_id: approvalId})});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        document.querySelector('#result').textContent = 'Demo approval recorded. Return to Phoenix Assist and click Check approval.';
+      } catch (error) {
+        document.querySelector('#result').textContent = error.message;
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
