@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo Case Passport</title>
+  <style>
+    body { max-width: 700px; margin: 36px auto; padding: 0 18px; font: 16px system-ui; background: #111827; color: #f3f4f6; }
+    p, li { line-height: 1.5; }
+    dl { display: grid; grid-template-columns: minmax(130px, 1fr) 2fr; gap: 10px; background: #1f2937; padding: 20px; border-radius: 12px; }
+    dt { color: #aebaca; } dd { margin: 0; overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>Demo case passport</h1>
+  <p>This is a fictional review summary on your local computer. It contains event names, not a raw transcript or real customer details. This screen does not provide reviewer authentication.</p>
+  <p id="status" role="status">Loading case…</p>
+  <dl id="fields"></dl>
+  <h2>Event trail</h2>
+  <ol id="events"></ol>
+  <script>
+    (async () => {
+      const status = document.querySelector('#status');
+      try {
+        const response = await fetch('/api/passport', {cache: 'no-store'});
+        const passport = await response.json();
+        if (!response.ok) throw new Error(passport.error);
+        status.textContent = 'Completed fictional case';
+        const labels = {
+          case_id: 'Case ID', language: 'Language', consent: 'Consent',
+          mock_approval: 'Mock approval', intent: 'Request', action: 'Action',
+          outcome: 'Outcome', handoff_reason: 'Handoff reason'
+        };
+        const fields = document.querySelector('#fields');
+        for (const [key, label] of Object.entries(labels)) {
+          const term = document.createElement('dt'); term.textContent = label;
+          const value = document.createElement('dd'); value.textContent = passport[key] ?? 'None';
+          fields.append(term, value);
+        }
+        const events = document.querySelector('#events');
+        for (const event of passport.events) {
+          const item = document.createElement('li'); item.textContent = event;
+          events.append(item);
+        }
+      } catch (error) { status.textContent = error.message; }
+    })();
+  </script>
+</body>
+</html>
