@@ -51,6 +51,20 @@ class AgentTests(unittest.TestCase):
         self.assertTrue(case.human_handoff)
         self.assertFalse(case.temporary_freeze)
 
+    def test_arabic_lost_card_uses_same_guard(self):
+        case = Case(language="ar")
+        responses = [case.reply(text) for text in ("ابدأ", "نعم", "تحقق", "بطاقة مفقودة")]
+        self.assertIn("مرحباً", responses[0])
+        self.assertTrue(case.temporary_freeze)
+        self.assertIn("تجميد", responses[-1])
+
+    def test_arabic_unverified_caller_cannot_freeze(self):
+        case = Case(language="ar")
+        for text in ("ابدأ", "نعم", "بطاقة مفقودة"):
+            case.reply(text)
+        self.assertFalse(case.temporary_freeze)
+        self.assertTrue(case.human_handoff)
+
 
 if __name__ == "__main__":
     unittest.main()
