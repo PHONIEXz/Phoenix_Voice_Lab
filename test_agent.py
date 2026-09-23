@@ -102,6 +102,32 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(case.approve_mock_bank("old-case", now=case.challenged_at + 1))
         self.assertFalse(case.verified)
 
+    def test_passport_excludes_raw_caller_secret_and_approval_id(self):
+        case = Case()
+        case.reply("start")
+        case.reply("yes")
+        case.reply("my pin is 1234")
+        case.reply("LOST")
+        case.reply("HUMAN")
+        passport = case.passport()
+        self.assertEqual(passport["intent"], "lost_card")
+        self.assertEqual(passport["handoff_reason"], "caller_requested_human_before_approval")
+        self.assertIn("unverified_freeze_request_refused", passport["events"])
+        self.assertNotIn("1234", str(passport))
+        self.assertNotIn(case.approval_id, str(passport))
+
+    def test_passport_records_successful_mock_action(self):
+        case = Case(language="ar")
+        case.reply("ابدأ")
+        case.reply("نعم")
+        case.approve_mock_bank(case.approval_id, now=case.challenged_at + 1)
+        case.reply("بطاقة مفقودة")
+        passport = case.passport()
+        self.assertEqual(passport["language"], "ar")
+        self.assertEqual(passport["mock_approval"], "approved")
+        self.assertEqual(passport["action"], "temporary_freeze_simulated")
+        self.assertIsNone(passport["handoff_reason"])
+
 
 if __name__ == "__main__":
     unittest.main()
