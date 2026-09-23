@@ -54,6 +54,18 @@ class BrowserFlowTests(unittest.TestCase):
         status, _, _ = self.post("/api/new", {}, origin="https://elsewhere.example")
         self.assertEqual(status, 403)
 
+    def test_browser_arabic_case(self):
+        status, initial, header = self.post("/api/new", {"language": "ar"})
+        self.assertEqual(status, 200)
+        self.assertIn("مرحباً", initial["message"])
+        cookie = header.split(";", 1)[0]
+        self.post("/api/reply", {"message": "نعم"}, cookie)
+        self.post("/api/reply", {"message": "تحقق"}, cookie)
+        status, result, _ = self.post("/api/reply", {"message": "الحالة"}, cookie)
+        self.assertEqual(status, 200)
+        self.assertIn("لا يوجد تجميد", result["message"])
+        self.assertNotIn("temporary_freeze_simulated", result["events"])
+
 
 if __name__ == "__main__":
     unittest.main()
