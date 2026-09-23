@@ -19,6 +19,8 @@ The microphone uses your browser's speech recognition, if it is available. Some 
 
 `web.py` listens only on your own computer and sends each message to the same `Case.reply()` function as the terminal app. The browser sends JSON to `/api/reply` and displays the response. This is how we keep the conversation rules in one place while changing the interface.
 
+Choose **العربية** in the browser to start an Arabic case. Try `نعم` → `تحقق` → `بطاقة مفقودة`, or `الحالة` for status. The dropdown also switches the browser speech language. Arabic pronunciation and recognition quality depend on voices and services available in your browser; typed Arabic always works.
+
 If your Windows installation uses the Python launcher, use `py` in place of `python`.
 
 Try a successful path by entering `yes`, `VERIFY`, `LOST`. Then restart and try `yes`, `VERIFY`, `STATUS`. Finally, try `no`, or enter something other than `VERIFY`.
