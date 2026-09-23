@@ -17,6 +17,8 @@ Run `python web.py`, then open `http://127.0.0.1:8765`. Type a response or click
 
 To try the trust gate: reply `yes`, open **Mock banking app** in its own tab, click **Approve this demo case** within two minutes, return to Phoenix Assist and click **Check approval**. Then enter `LOST`, `STATUS`, or `HUMAN`. Say `VERIFY` in the conversation first to see that it does not approve the case. A new case needs a new approval; an old approval cannot authorize it.
 
+When the case ends, click **View case passport**. The local reviewer screen shows the consent and mock approval states, request type, simulated action, outcome, reason for handoff, and an event trail. It intentionally omits raw caller messages and the approval ID. A case must finish before its passport is available. This reviewer screen has no real staff authentication.
+
 The microphone uses your browser's speech recognition, if it is available. Some browsers send audio to an online recognition service; this demo does not save audio. If speech recognition is unavailable, typed input still works. Browser voices differ by operating system. No ElevenLabs account or key is needed for this local lesson.
 
 `web.py` listens only on your own computer and sends each message to the same `Case.reply()` function as the terminal app. The browser sends JSON to `/api/reply` and displays the response. This is how we keep the conversation rules in one place while changing the interface.
