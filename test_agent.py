@@ -35,6 +35,22 @@ class AgentTests(unittest.TestCase):
         case.reply("1234")
         self.assertNotIn("1234", " ".join(case.audit))
 
+    def test_status_does_not_change_card(self):
+        case = Case()
+        for text in ("start", "yes", "verify"):
+            case.reply(text)
+        response = case.reply("status")
+        self.assertIn("No temporary freeze", response)
+        self.assertFalse(case.temporary_freeze)
+        self.assertFalse(case.human_handoff)
+
+    def test_human_request_hands_off_without_card_action(self):
+        case = Case()
+        for text in ("start", "yes", "verify", "human"):
+            case.reply(text)
+        self.assertTrue(case.human_handoff)
+        self.assertFalse(case.temporary_freeze)
+
 
 if __name__ == "__main__":
     unittest.main()
