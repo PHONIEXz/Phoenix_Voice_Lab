@@ -35,6 +35,15 @@ class BrowserFlowTests(unittest.TestCase):
         conn.close()
         return result
 
+    def get(self, path, cookie=None):
+        port = self.server.server_address[1]
+        conn = http.client.HTTPConnection("127.0.0.1", port)
+        conn.request("GET", path, headers={"Cookie": cookie} if cookie else {})
+        response = conn.getresponse()
+        result = response.status, response.read().decode("utf-8")
+        conn.close()
+        return result
+
     def test_browser_case_preserves_state_and_protects_actions(self):
         status, initial, header = self.post("/api/new", {})
         self.assertEqual(status, 200)
@@ -96,6 +105,21 @@ class BrowserFlowTests(unittest.TestCase):
         conn.close()
         self.assertEqual(response.status, 200)
         self.assertIn("Mock banking app", body)
+
+    def test_passport_requires_completed_case_and_contains_outcome(self):
+        _, _, header = self.post("/api/new", {})
+        cookie = header.split(";", 1)[0]
+        status, _ = self.get("/api/passport", cookie)
+        self.assertEqual(status, 409)
+        self.post("/api/reply", {"message": "no"}, cookie)
+        status, raw = self.get("/api/passport", cookie)
+        self.assertEqual(status, 200)
+        passport = json.loads(raw)
+        self.assertEqual(passport["outcome"], "consent_declined")
+        self.assertEqual(passport["action"], "none")
+        status, page = self.get("/review", cookie)
+        self.assertEqual(status, 200)
+        self.assertIn("Demo case passport", page)
 
 
 if __name__ == "__main__":
