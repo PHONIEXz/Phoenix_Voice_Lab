@@ -13,6 +13,7 @@ from agent import Case, LINES, Stage
 
 PAGE = Path(__file__).with_name("index.html").read_bytes()
 BANK_PAGE = Path(__file__).with_name("bank.html").read_bytes()
+REVIEW_PAGE = Path(__file__).with_name("review.html").read_bytes()
 SESSIONS: dict[str, Case] = {}
 MAX_BODY = 4096
 
@@ -51,10 +52,19 @@ class Handler(BaseHTTPRequestHandler):
                 "message": LINES[case.language]["request"] if case.verified else "",
             })
             return
-        if path not in ("/", "/bank"):
+        if path == "/api/passport":
+            case = self.current_case()
+            if case is None:
+                self.respond_json(HTTPStatus.BAD_REQUEST, {"error": "Start a new case"})
+            elif case.stage is not Stage.DONE:
+                self.respond_json(HTTPStatus.CONFLICT, {"error": "The case has not ended"})
+            else:
+                self.respond_json(HTTPStatus.OK, case.passport())
+            return
+        if path not in ("/", "/bank", "/review"):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        page = PAGE if path == "/" else BANK_PAGE
+        page = {"/": PAGE, "/bank": BANK_PAGE, "/review": REVIEW_PAGE}[path]
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(page)))
